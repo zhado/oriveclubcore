@@ -1,0 +1,32 @@
+#!/bin/bash
+sudo ip netns delete net1
+sudo ip netns delete net2
+sudo ip netns delete net3
+
+sudo ip netns add net1
+sudo ip netns add net2
+sudo ip netns add net3
+
+sudo ip link add cab_a1 netns net1 type veth peer cab_a2 netns net3
+sudo ip link add cab_b1 netns net2 type veth peer cab_b2 netns net3
+
+sudo ip netns exec net1 ip addr add 192.168.1.2/24 dev cab_a1
+sudo ip netns exec net1 ip link set cab_a1 up
+sudo ip netns exec net1 ip route add default via 192.168.1.1 dev cab_a1
+
+sudo ip netns exec net2 ip addr add 192.168.2.2/24 dev cab_b1
+sudo ip netns exec net2 ip link set cab_b1 up
+sudo ip netns exec net2 ip route add default via 192.168.2.1 dev cab_b1
+
+sudo ip netns exec net3 ip addr add 192.168.1.1/24 dev cab_a2
+sudo ip netns exec net3 ip addr add 192.168.2.1/24 dev cab_b2
+sudo ip netns exec net3 ip link set cab_b2 up
+sudo ip netns exec net3 ip link set cab_a2 up
+sudo ip netns exec net3 sysctl net.ipv4.ip_forward=1
+
+sudo ip netns exec net3 sudo iptables -P FORWARD DROP
+sudo ip netns exec net3 sudo iptables -A FORWARD -i cab_a2 -o cab_b2 -j ACCEPT
+sudo ip netns exec net3 sudo iptables -A FORWARD -i cab_b2 -o cab_a2 -j ACCEPT
+sudo ip netns exec net3 sudo iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+sudo ip netns exec net3 sudo iptables -t nat -A POSTROUTING -o cab_a2 -j MASQUERADE
+sudo ip netns exec net3 sudo iptables -t nat -A POSTROUTING -o cab_b2 -j MASQUERADE
