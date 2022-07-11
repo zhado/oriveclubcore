@@ -25,7 +25,7 @@ def get_info_from_server(serv_ip):
 
     while True:
         data = sock.recv(1024).decode()
-        if data!='0':
+        if (data!='0' and data.split(' ')[0]!="peer"):
             peer_ip, peer_sport, peer_dport = data.split(' ')
             peer_sport = int(peer_sport)
             peer_dport = int(peer_dport)
@@ -44,8 +44,9 @@ def setup_local():
         print("starting as first client. sending to 50001")
         return sock, '127.0.0.1', 50001, 50002
 
-
 def main():
+    start_time=0
+
     parser = argparse.ArgumentParser(description='oriveclubcore yay')
     parser.add_argument('--dest_ip')
     parser.add_argument('--dest_port')
@@ -83,6 +84,16 @@ def main():
     def listen():
         while True:
             data = sock.recv(1024)
+            if(data=="\\ping".encode()):
+                print("got ping")
+                sock.sendto("\\pong".encode(), (peer_ip,peer_sport))
+            if(data=="\\pong".encode()):
+                delta_time=time.perf_counter()-start_time
+                time_msg="responce time: " + str(delta_time)
+                print(time_msg)
+                sock.sendto(time_msg.encode(), (peer_ip,peer_sport))
+
+
             print('\rpeer: {}\n> '.format(data.decode()), end='')
 
     listener = threading.Thread(target=listen, daemon=True)
@@ -91,6 +102,8 @@ def main():
     while True:
         try: 
             msg = input('> ')
+            if(msg == "\\ping"):
+                start_time=time.perf_counter()
             sock.sendto(msg.encode(), (peer_ip,peer_sport))
         except (KeyboardInterrupt, EOFError):
             sock.sendto("peer disconnected".encode(), (peer_ip,peer_sport))
